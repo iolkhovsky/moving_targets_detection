@@ -2,31 +2,6 @@ import cv2
 import numpy as np
 
 
-class Cropper:
-
-    def __init__(self, roi):
-        assert len(roi) == 4
-        self.x, self.y, self.w, self.h = roi
-        assert type(self.w) == int
-        assert type(self.h) == int
-        return
-
-    def __call__(self, *args, **kwargs):
-        img = args[0]
-        assert type(img) == np.ndarray
-        assert 2 <= len(img.shape) <= 3
-        xsz, ysz = img.shape[1], img.shape[0]
-        x, y = self.x, self.y
-        if (x is None) or (y is None):
-            x = int((xsz - self.w) / 2)
-            y = int((ysz - self.h) / 2)
-        x1 = min(xsz - 1, max(0, x))
-        x2 = min(xsz - 1, max(0, x + self.w - 1))
-        y1 = min(ysz - 1, max(0, y))
-        y2 = min(ysz - 1, max(0, y + self.h - 1))
-        return img[y1:y2+1, x1:x2+1]
-
-
 class DenseFlowTracker:
 
     def __init__(self):
@@ -40,13 +15,16 @@ class DenseFlowTracker:
     def __call__(self, *args, **kwargs):
         pass
 
-    def process(self, prev_frame, next_frame, mask=None):
+    def process(self, prev_frame, next_frame):
         assert type(prev_frame) == np.ndarray
         assert type(next_frame) == np.ndarray
-        assert len(prev_frame.shape) == 2
-        assert len(next_frame.shape) == 2
-        self.optflow_config["prev"] = prev_frame.copy()
-        self.optflow_config["next"] = next_frame.copy()
+        p_frame, n_frame = prev_frame.copy(), next_frame.copy()
+        if len(p_frame.shape) != 2:
+            p_frame = cv2.cvtColor(p_frame, cv2.COLOR_BGR2GRAY)
+        if len(n_frame.shape) != 2:
+            n_frame = cv2.cvtColor(n_frame, cv2.COLOR_BGR2GRAY)
+        self.optflow_config["prev"] = p_frame.copy()
+        self.optflow_config["next"] = n_frame.copy()
         flow = cv2.calcOpticalFlowFarneback(**self.optflow_config)
         mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
         return mag, ang
@@ -56,10 +34,8 @@ if __name__ == "__main__":
     cap = cv2.VideoCapture("test.mp4")
 
     tracker = DenseFlowTracker()
-    cropper = Cropper(roi=(None, None, 600, 600))
 
     ret, frame1 = cap.read()
-    frame1 = cropper(frame1)
     prvs = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
     hsv = np.zeros_like(frame1)
     hsv[..., 1] = 255
@@ -70,7 +46,6 @@ if __name__ == "__main__":
     ret = True
     while ret:
         ret, frame2 = cap.read()
-        frame2 = cropper(frame2)
         if not ret:
             break
 
