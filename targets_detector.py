@@ -5,6 +5,7 @@ import numpy as np
 
 from cropper import Cropper
 from dense_tracker import DenseFlowTracker
+from clusterizer import Clusterizer
 from utils import *
 
 OPENCV_OBJECT_TRACKERS = {
@@ -59,6 +60,7 @@ def run(args):
         cropper = Cropper((None, None, args.crop_x, args.crop_y))
 
     dense_tracker = DenseFlowTracker()
+    clusterizer = Clusterizer()
 
     while True:
         if frame is not None:
@@ -91,6 +93,8 @@ def run(args):
                         hsv[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
                         rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
                         cv2.imshow('Flow', rgb)
+                        clusters, colormap = clusterizer(mag, ang)
+                        cv2.imshow('Clusters', colormap)
             fps.update()
             fps.stop()
 
