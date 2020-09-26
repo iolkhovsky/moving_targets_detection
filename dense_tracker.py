@@ -10,10 +10,10 @@ class DenseFlowTracker:
         pass
 
     def __str__(self):
-        pass
+        return "DenseFlowTracker"
 
     def __call__(self, *args, **kwargs):
-        pass
+        return self.process(args[0], args[1])
 
     def process(self, prev_frame, next_frame):
         assert type(prev_frame) == np.ndarray

@@ -1,5 +1,7 @@
-from sklearn.cluster import DBSCAN, KMeans, MiniBatchKMeans, AgglomerativeClustering
+import cv2
 import numpy as np
+
+color = np.random.randint(0, 255, (100, 3))
 
 
 def normalize(x):
@@ -12,7 +14,6 @@ def apply(x, color):
 
 
 def draw_clusters(labels):
-    color = np.random.randint(0, 255, (labels.max()+1, 3))
     # out = np.zeros(shape=(labels.shape[0], labels.shape[1], 3), dtype=np.uint8)
     out = apply(labels, color)
     return out.astype(np.uint8)
@@ -20,32 +21,32 @@ def draw_clusters(labels):
 
 class Clusterizer:
 
-    def __init__(self):
-        pass
+    def __init__(self, clusters_cnt):
+        self._clusters_cnt = clusters_cnt
+        return
 
     def __str__(self):
-        pass
+        return "Dense flow clusterizer"
+
+    @staticmethod
+    def convert_flow_2_img(mag, ang):
+        norm_mag = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+        hsv = np.zeros(shape=(mag.shape[0], mag.shape[1], 3), dtype=np.uint8)
+        hsv[..., 0] = ang * 180 / np.pi / 2
+        hsv[..., 1] = 255
+        hsv[..., 2] = norm_mag
+        rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        return rgb
 
     def process(self, mag, ang):
-        frame_shape = mag.shape
-        y_coord, x_coord = np.indices(mag.shape)
-        y_coord = y_coord.flatten()
-        x_coord = x_coord.flatten()
-        mag = mag.flatten()
-        ang = ang.flatten()
-
-        mag = normalize(mag)
-        ang = normalize(ang)
-        y_coord = normalize(y_coord)
-        x_coord = normalize(x_coord)
-        descriptors = np.asarray([y_coord, x_coord, mag, ang])
-        descriptors = np.swapaxes(descriptors, 0, 1)
-        descriptors = np.reshape(descriptors, (-1, 4))
-        clustering = DBSCAN(eps=3, min_samples=2).fit(descriptors)
-        #clustering = MiniBatchKMeans(n_clusters=5).fit(descriptors)
-        #clustering = AgglomerativeClustering().fit(descriptors)
-        out_map = np.reshape(clustering.labels_, frame_shape)
-        return out_map, draw_clusters(out_map)
+        rgb = self.convert_flow_2_img(mag, ang)
+        pixels = rgb.reshape((-1, 3))
+        pixels = np.float32(pixels)
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+        ret, label, center = cv2.kmeans(pixels, self._clusters_cnt, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+        center = np.uint8(center)
+        clustered_img = center[label.flatten()]
+        return label.reshape((rgb.shape[0], rgb.shape[1])), clustered_img.reshape(rgb.shape)
 
     def __call__(self, *args, **kwargs):
         return self.process(args[0], args[1])

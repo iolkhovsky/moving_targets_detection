@@ -1,11 +1,11 @@
 import argparse
 import cv2
 from imutils.video import FPS
-import numpy as np
 
 from cropper import Cropper
 from dense_tracker import DenseFlowTracker
 from clusterizer import Clusterizer
+from object_detector import ObjectDetector
 from utils import *
 
 OPENCV_OBJECT_TRACKERS = {
@@ -23,11 +23,11 @@ def parse_cmd_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=str, default="video",
                         help="Source of video stream")
-    parser.add_argument("--videofile", type=str, default="test.mp4",
+    parser.add_argument("--videofile", type=str, default="video/test.mp4",
                         help="Path to the videofile")
     parser.add_argument("--camid", type=int, default=0,
                         help="Id of webcamera")
-    parser.add_argument("--roi_tracker", type=str, default="kcf", #default="kcf",
+    parser.add_argument("--roi_tracker", type=str, default="kcf",
                         help="Type of ROI tracker")
     parser.add_argument("--crop_x", type=int, default=960,
                         help="Crop size X (horizontal)")
@@ -60,7 +60,9 @@ def run(args):
         cropper = Cropper((None, None, args.crop_x, args.crop_y))
 
     dense_tracker = DenseFlowTracker()
-    clusterizer = Clusterizer()
+    clusters_cnt = 4
+    clusterizer = Clusterizer(clusters_cnt)
+    detector = ObjectDetector()
 
     while True:
         if frame is not None:
@@ -71,7 +73,6 @@ def run(args):
         if cropper:
             frame = cropper(frame)
         visualization_frame = frame.copy()
-        (H, W) = frame.shape[:2]
 
         if roi_init_bbox:
             prev_roi_bbox = box
@@ -87,45 +88,12 @@ def run(args):
                         x, y, w, h = common_roi
                         prev_subframe = prev_frame[y:y+h, x:x+w]
                         subframe = frame[y:y+h, x:x+w]
-                        mag, ang = dense_tracker.process(prev_subframe, subframe)
-                        norm_mag = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
-                        hsv = np.zeros_like(subframe)
-                        hsv[..., 0] = ang * 180 / np.pi / 2
-                        hsv[..., 1] = 255
-                        hsv[..., 2] = norm_mag
-                        rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-                        cv2.imshow('Flow', rgb)
-
-                        median_speed = np.median(norm_mag)
-                        ret, thresh1 = cv2.threshold(norm_mag, median_speed, 255, cv2.THRESH_BINARY)
-                        at = cv2.adaptiveThreshold(norm_mag.astype(np.uint8), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                                   cv2.THRESH_BINARY, 9, -5)
-                        cv2.imshow('thresh', thresh1)
-                        cv2.imshow('ad_thresh', at)
-
-                        '''Z = rgb.reshape((-1, 3))
-                        # convert to np.float32
-                        Z = np.float32(Z)
-                        # define criteria, number of clusters(K) and apply kmeans()
-                        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-                        K = int(rgb.shape[0] * rgb.shape[1] / 1200.) * 2
-                        if K > 4:
-                            K = 4
-                        ret, label, center = cv2.kmeans(Z, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
-                        # Now convert back into uint8, and make original image
-                        center = np.uint8(center)
-                        res = center[label.flatten()]
-                        res2 = res.reshape((rgb.shape))
-                        cv2.imshow('res2', res2)'''
-
-                        #clusters, colormap = clusterizer(mag, ang)
-                        #cv2.imshow('Clusters', colormap)
-                        #ret, thresh1 = cv2.threshold(mag, 0.75 * np.max(mag), np.max(mag), cv2.THRESH_BINARY)
-                        #norm_mag = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-                        #ret, thresh = cv2.threshold(norm_mag, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-                        #th3 = cv2.adaptiveThreshold(norm_mag, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, \
-                        #                            cv2.THRESH_BINARY, 9, -5)
-                        #cv2.imshow('Motion', thresh)
+                        mag, ang = dense_tracker(prev_subframe, subframe)
+                        labels, clustered_img = clusterizer(mag, ang)
+                        objects = detector(labels, clusters_cnt)
+                        for x, y, w, h in objects:
+                            cv2.rectangle(clustered_img, (x, y), (x+w, y+h), (255, 0, 0), 2)
+                        cv2.imshow('Clusterized', clustered_img)
             fps.update()
             fps.stop()
 
