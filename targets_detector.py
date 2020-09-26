@@ -79,7 +79,6 @@ def run(args):
             (success, box) = tracker.update(frame)
             if success:
                 (x, y, w, h) = [int(v) for v in box]
-                print("Roi: ", x, y, w, h)
                 cv2.rectangle(visualization_frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
                 common_roi = find_common_roi(box, prev_roi_bbox)
