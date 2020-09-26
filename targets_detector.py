@@ -61,7 +61,7 @@ def run(args):
 
     dense_tracker = DenseFlowTracker()
     clusters_cnt = 4
-    clusterizer = Clusterizer(clusters_cnt)
+    clusterizer = Clusterizer(clusters_cnt, debug=True)
     detector = ObjectDetector()
 
     while True:
@@ -78,8 +78,8 @@ def run(args):
             prev_roi_bbox = box
             (success, box) = tracker.update(frame)
             if success:
-                (x, y, w, h) = [int(v) for v in box]
-                cv2.rectangle(visualization_frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                (roi_x, roi_y, roi_w, roi_h) = [int(v) for v in box]
+                cv2.rectangle(visualization_frame, (roi_x, roi_y), (roi_x + roi_w, roi_y + roi_h), (0, 255, 0), 2)
 
                 common_roi = find_common_roi(box, prev_roi_bbox)
                 if common_roi is not None:
@@ -90,8 +90,10 @@ def run(args):
                         mag, ang = dense_tracker(prev_subframe, subframe)
                         labels, clustered_img = clusterizer(mag, ang)
                         objects = detector(labels, clusters_cnt)
-                        for x, y, w, h in objects:
-                            cv2.rectangle(clustered_img, (x, y), (x+w, y+h), (255, 0, 0), 2)
+                        for obj_x, obj_y, obj_w, obj_h in objects:
+                            cv2.rectangle(clustered_img, (obj_x, obj_y), (obj_x+obj_w, obj_y+obj_h), (255, 0, 0), 2)
+                            cv2.rectangle(visualization_frame, (roi_x + obj_x, roi_y + obj_y),
+                                          (roi_x + obj_x + obj_w, roi_y + obj_y + obj_h), (0, 0, 255), 1)
                         cv2.imshow('Clusterized', clustered_img)
             fps.update()
             fps.stop()

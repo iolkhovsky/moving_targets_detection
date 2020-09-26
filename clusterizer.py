@@ -21,8 +21,9 @@ def draw_clusters(labels):
 
 class Clusterizer:
 
-    def __init__(self, clusters_cnt):
+    def __init__(self, clusters_cnt, debug=False):
         self._clusters_cnt = clusters_cnt
+        self._debug = debug
         return
 
     def __str__(self):
@@ -40,6 +41,8 @@ class Clusterizer:
 
     def process(self, mag, ang):
         rgb = self.convert_flow_2_img(mag, ang)
+        if self._debug:
+            cv2.imshow('Optical flow', rgb)
         pixels = rgb.reshape((-1, 3))
         pixels = np.float32(pixels)
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
